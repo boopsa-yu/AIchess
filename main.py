@@ -43,7 +43,6 @@ def get_game_result(board: chess.Board) -> dict:
     # 其他结束情况
     return {"game_over": True, "result": "1/2-1/2", "reason": "other"}
 
-
 # 定义对 GET / 的请求处理器，返回内容是 HTML
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -54,49 +53,44 @@ async def read_root(request: Request):
 @app.post("/move")
 async def move(request: Request):
     global board
-    if board.is_game_over():
+    data = await request.json()
+
+    # 1. 回合验证
+    if board.turn != chess.WHITE:
         return JSONResponse(
-            content={ 'status': 'finished', 'result': board.result() },
-            status_code=200
+            content={'error': '非玩家回合'}, 
+            status_code=400
         )
 
-    data = await request.json()
-    source = data.get('from')
-    target = data.get('to')
-    promotion = data.get('promotion', 'q') # 默认升变为 后
-
+    # 2. 移动验证与执行
     try:
-        move = chess.Move.from_uci(source + target)
+        uci_str = f"{data['from']}{data['to']}{data.get('promotion', '')}"
+        move = chess.Move.from_uci(uci_str)
         if move not in board.legal_moves:
-            return JSONResponse(content={'error': '非法走法'}, status_code=400)
-    except ValueError:
-        return JSONResponse(content={'error': '非法走法'}, status_code=400)
+            raise ValueError
+    except Exception:
+        return JSONResponse(
+            content={'error': '非法走法'}, 
+            status_code=400
+        )
 
+    # 3. 更新棋盘状态
     board.push(move)
-    # 检查玩家走子后是否结束
-    result_info = get_game_result(board)
-    if result_info["game_over"]:
-        return {
-            "ai_move": None,
-            **result_info
-        }
+    result_info = get_game_result(board)  # 第一次状态检查
 
-    # AI 走法
-    ai_move = get_ai_move(board)
-    if ai_move:
-        board.push(ai_move)
-        # 判定是否和棋
-        result_info = get_game_result(board)
-        return {
-            "ai_move": ai_move.uci(),
-            **result_info
-        }
-    else:
-        result_info = get_game_result(board)
-        return {
-            "ai_move": None,
-            **result_info
-        }
+    # 4. AI 走子
+    ai_move = None
+    if not result_info["game_over"]:
+        ai_move = get_ai_move(board)
+        if ai_move:
+            board.push(ai_move)
+            result_info = get_game_result(board)  # 第二次状态检查
+
+    return {
+        "fen": board.fen(),
+        "ai_move": ai_move.uci() if ai_move else None,
+        **result_info
+    }
 
 @app.post("/reset")
 async def reset():
