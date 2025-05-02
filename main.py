@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import chess
 from ai_engine import get_ai_move
+import logging
 
 # 创建 FastAPI 应用实例
 app = FastAPI()
@@ -12,6 +13,17 @@ app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 # 指定模板目录
 templates = Jinja2Templates(directory="templates")
+
+# 日志配置
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler()
+formatter = logging.Formatter(
+    "%(asctime)s - %(module)s - %(funcName)s - line:%(lineno)d - %(levelname)s - %(message)s"
+)
+handler.setFormatter(formatter)
+logger.addHandler(handler)  # 将日志输出至屏幕
+
 
 # 初始化棋局
 board = chess.Board()
@@ -65,9 +77,13 @@ async def move(request: Request):
     # 2. 移动验证与执行
     try:
         uci_str = f"{data['from']}{data['to']}{data.get('promotion', '')}"
+        logger.info(f"uci_str: {uci_str}")
         move = chess.Move.from_uci(uci_str)
         if move not in board.legal_moves:
+            logger.info("Test invalid move")
             raise ValueError
+        else:
+            logger.info("Test valid move")
     except Exception:
         return JSONResponse(
             content={'error': '非法走法'}, 
