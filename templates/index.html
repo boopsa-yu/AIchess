@@ -28,39 +28,36 @@
             if (game.game_over() || 
                 (game.turn() === 'w' && piece[0] !== 'w') || 
                 (game.turn() === 'b' && piece[0] !== 'b')) {
+                console.error('错误的棋子选择');
                 return false;
             }
         }
 
         // 处理棋子落子逻辑
         function onDrop(source, target) {
-            // 获取升变信息
+            const moves = game.moves({ verbose: true });
+            const match = moves.find(m =>
+                m.from === source && m.to === target
+            );
+            if (!match) {
+                console.error('非法移动');
+                return 'snapback';
+            }
+
+            // 升变判断
             var promotion = '';
-            var isPawn = game.get(source).type === 'p';
-            var rank = target.charAt(1);
-            var piece = game.get(source);
-            if (isPawn) {
-                if ((rank === '8' && piece.color === 'w') || 
-                        (rank === '1' && piece.color === 'b')) {
-                    // 默认升变为 后
-                    var choice = prompt("请选择升变棋子 (q=后, r=车, b=象, n=马)", "q");
-                    if (['q','r','b','n'].indexOf(choice) !== -1) {
-                        promotion = choice;
-                    }
+            if (match.promotion) {
+                const choice = prompt("请选择升变棋子 (q=后, r=车, b=象, n=马)", "q");
+                if (['q','r','b','n'].includes(choice)) {
+                    promotion = choice;
+                    console.log('合法升变');
+                } else {
+                    // 用户取消或选了非法值，也直接回退
+                    console.error('未选择合法升变');
+                    return 'snapback';
                 }
             }
 
-            var move = game.move({
-                from: source,
-                to: target,
-                promotion: promotion
-            });
-            if (move === null) {
-                return 'snapback'; // 非法走子，棋子回位
-            }
-            game.undo(); // 撤销临时走子
-            
-            // 发送请求到服务器
             fetch('/move', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
