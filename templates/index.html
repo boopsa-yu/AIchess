@@ -23,11 +23,48 @@
         var board = null;
         var game = new Chess();
 
-        // 仅允许拖动当前回合方的棋子
+        async function Move(player, moveData = null) {
+            try {
+                const endpoint = `/move/${player}`;
+                const options = player === 'human' ? {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(moveData)
+                } : { method: 'POST' };
+
+                const response = await fetch(endpoint, options);
+                const data = await response.json();
+                
+                if (data.error) throw data.error;
+
+                // 更新棋盘状态
+                game.load(data.fen);
+                board.position(data.fen, true);
+                updateStatus(data);
+
+                // 自动流转到下一个玩家
+                if (!data.game_over) {
+                    const nextHandler = data.next_player === 'ai' ? AIMove : null;
+                    nextHandler && nextHandler();
+                }
+            } catch (error) {
+                console.error(`${player}移动错误:`, error);
+                board.position(game.fen());
+            }
+        }
+
+        // 具体移动处理函数
+        function HumanMove(source, target, promotion) {
+            return Move('human', { from: source, to: target, promotion });
+        }
+
+        function AIMove() {
+            return Move('ai');
+        }
+
+        // 仅允许拖动自己的棋子
         function onDragStart(source, piece, position, orientation) {
-            if (game.game_over() || 
-                (game.turn() === 'w' && piece[0] !== 'w') || 
-                (game.turn() === 'b' && piece[0] !== 'b')) {
+            if (game.game_over() || piece[0] !== 'w') {
                 console.error('错误的棋子选择');
                 return false;
             }
@@ -58,25 +95,7 @@
                 }
             }
 
-            fetch('/move', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ from: source, to: target, promotion: promotion })
-            })
-            .then(async response => {
-                if (!response.ok) throw await response.json();
-                return response.json();
-            })
-            .then(data => {
-                // 同步服务器状态
-                game.load(data.fen);
-                board.position(data.fen, true);
-                updateStatus(data);
-            })
-            .catch(error => {
-                console.error('错误:', error);
-                board.position(game.fen()); // 回退到正确状态
-            });
+            HumanMove(source, target, promotion);
         }
 
         // 状态更新

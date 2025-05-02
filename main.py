@@ -1,4 +1,5 @@
 # main.py
+from time import sleep
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -27,6 +28,44 @@ logger.addHandler(handler)  # 将日志输出至屏幕
 
 # 初始化棋局
 board = chess.Board()
+players = {
+    chess.WHITE: "human",
+    chess.BLACK: "ai"
+}
+
+# 定义对 GET / 的请求处理器，返回内容是 HTML
+@app.get("/", response_class=HTMLResponse)
+async def read_root(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+# 走子处理接口
+# 玩家选择棋子移动，之后AI根据玩家的选择移动
+@app.post("/move/{player}")
+async def move(request: Request, player: str):
+    global board
+    data = await request.json() if player == "human" else None
+
+    moves = {
+        "human": human_move,
+        "ai": ai_move
+    }
+    
+    if player not in moves:
+        return JSONResponse(
+            content={'error': '非法的移动类型'},
+            status_code=400
+        )
+
+    return one_move_step(moves[player], data)
+
+@app.post("/reset")
+async def reset():
+    global board
+    board.reset()
+    return {'status': '重置成功',
+            'current_player': players.get(board.turn)
+    }
+
 
 def get_game_result(board: chess.Board) -> dict:
     """
@@ -55,61 +94,54 @@ def get_game_result(board: chess.Board) -> dict:
     # 其他结束情况
     return {"game_over": True, "result": "1/2-1/2", "reason": "other"}
 
-# 定义对 GET / 的请求处理器，返回内容是 HTML
-@app.get("/", response_class=HTMLResponse)
-async def read_root(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
-
-# 走子处理接口
-# 玩家选择棋子移动，之后AI根据玩家的选择移动
-@app.post("/move")
-async def move(request: Request):
+def human_move(data) -> chess.Move:
     global board
-    data = await request.json()
+    if 'from' not in data or 'to' not in data:
+        raise ValueError("缺少移动数据")
+    
+    uci_str = f"{data['from']}{data['to']}{data.get('promotion', '')}"
+    move = chess.Move.from_uci(uci_str)
+    if move not in board.legal_moves:
+        raise ValueError("非法走法")
+    return move
 
-    # 1. 回合验证
-    if board.turn != chess.WHITE:
+def ai_move(data=None) -> chess.Move:
+    """AI移动生成逻辑"""
+    global board
+    move = get_ai_move(board)
+    sleep(1)
+    if not move:
+        raise RuntimeError("AI无法生成合法移动")
+    return move
+
+def one_move_step(move_generator, data) -> dict:
+    """通用移动处理框架"""
+    global board
+
+    # 验证当前回合类型
+    current_player = players.get(board.turn)
+    expected_player_type = "human" if move_generator == human_move else "ai"
+    if current_player != expected_player_type:
         return JSONResponse(
-            content={'error': '非玩家回合'}, 
+            content={'error': f'当前不是 {expected_player_type} 回合'},
             status_code=400
         )
 
-    # 2. 移动验证与执行
+    # 生成移动
     try:
-        uci_str = f"{data['from']}{data['to']}{data.get('promotion', '')}"
-        logger.info(f"uci_str: {uci_str}")
-        move = chess.Move.from_uci(uci_str)
-        if move not in board.legal_moves:
-            logger.info("Test invalid move")
-            raise ValueError
-        else:
-            logger.info("Test valid move")
-    except Exception:
+        move = move_generator(data)  # data参数需要根据移动类型传递
+    except Exception as e:
         return JSONResponse(
-            content={'error': '非法走法'}, 
-            status_code=400
+            content={'error': str(e)},
+            status_code=400 if isinstance(e, ValueError) else 500
         )
 
-    # 3. 更新棋盘状态
+    # 执行移动并返回状态
     board.push(move)
-    result_info = get_game_result(board)  # 第一次状态检查
-
-    # 4. AI 走子
-    ai_move = None
-    if not result_info["game_over"]:
-        ai_move = get_ai_move(board)
-        if ai_move:
-            board.push(ai_move)
-            result_info = get_game_result(board)  # 第二次状态检查
-
+    result_info = get_game_result(board)  # 状态检查
     return {
         "fen": board.fen(),
-        "ai_move": ai_move.uci() if ai_move else None,
-        **result_info
+        "last_move": move.uci(),
+        **result_info,
+        "next_player": players.get(board.turn)
     }
-
-@app.post("/reset")
-async def reset():
-    global board
-    board.reset()
-    return {'status': '重置成功'}
