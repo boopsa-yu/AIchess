@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 import chess
-from ai_engine import get_ai_move
+from ai_chess import AIChess
 import logging
 
 # 创建 FastAPI 应用实例
@@ -68,12 +68,6 @@ async def reset():
 
 
 def get_game_result(board: chess.Board) -> dict:
-    """
-    检查棋局结束状态并返回结果字典：
-    - game_over: bool
-    - result: "1-0" / "0-1" / "1/2-1/2" / " Playing "
-    - reason: "checkmate" / "stalemate" / "insufficient_material" / ...
-    """
     if not board.is_game_over():
         return {"game_over": False, "result": "", "reason": ""}
     # 以下按优先级判断具体结束方式
@@ -108,8 +102,8 @@ def human_move(data) -> chess.Move:
 def ai_move(data=None) -> chess.Move:
     """AI移动生成逻辑"""
     global board
-    move = get_ai_move(board)
-    sleep(1)
+    ai_chess = AIChess()
+    move = ai_chess.get_best_move(board)
     if not move:
         raise RuntimeError("AI无法生成合法移动")
     return move

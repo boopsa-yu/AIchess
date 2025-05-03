@@ -101,9 +101,11 @@
         // 状态更新
         function updateStatus(data) {
             var status = '';
-            if (game.game_over()) {
-                if (data.reason === 'checkmate') {
-                    status = `游戏结束！${data.result === '1-0' ? '白方' : '黑方'} 获胜！`;
+            if (data.game_over) {
+                if (data.result === '1-0') {
+                    status = '游戏结束！白方 获胜！';
+                } else if (data.result === '0-1') {
+                    status = '游戏结束！黑方 获胜！';
                 } else {
                     status = `平局（原因：${data.reason.replace(/_/g, ' ')})`;
                 }
