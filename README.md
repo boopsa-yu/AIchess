@@ -89,7 +89,7 @@ print(board.shredder_fen())
 
 ### 编码为位平面
 
-思路来源于 [twichchess](https://github.com/geohot/twitchchess)
+思路来源于：[twichchess](https://github.com/geohot/twitchchess)
 
 将不同特征（如棋子种类、易位权利、吃过路标记）的多值编码用多个二值通道（bit‑planes）表示，可以让卷积核更容易在局部感受野内学习到这些离散特征
 
@@ -110,6 +110,30 @@ print(board.shredder_fen())
 TODO:
 - 特殊操作加权，如 将军、绝杀、吃子、升变
 
+每一步操作的得分评估函数：
+
+```python
+before = evaluate(board)
+board.push(move)
+after = evaluate(board)
+delta = after - before
+# 2. 阈值剪枝
+if abs(delta) < MIN_DELTA:
+    delta = 0.0
+# 3. 线性阶段因子 φ = t/T
+phi = index / float(total_moves)
+# 4. 阶段加权
+local = delta * (ALPHA + (1 - ALPHA) * phi)
+# 5. 折扣到当前步：γ^(T-t)
+discount = GAMMA ** (total_moves - index)
+raw = local * discount
+```
+
+由于数据范围较大，因此做了简单的归一化，用当前得分除以当前对局得分绝对值的最大值。
+
+## 训练数据来源
+
+[Chess Game Dataset (Lichess)](https://www.kaggle.com/datasets/datasnaek/chess)
 
 ## 优化方向
 - 将棋局分为：开局、中局、残局。以优化棋局评估函数
