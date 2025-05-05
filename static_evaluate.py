@@ -123,3 +123,16 @@ def evaluate(board: chess.Board) -> int:
         score += 3000 if board.turn == chess.BLACK else -3000
 
     return score
+
+MAX_MATERIAL = sum([100, 320, 330, 500, 900]) * 2  # 双方总和
+def material_total(board: chess.Board) -> int:
+    total = 0
+    for piece in board.piece_map().values():
+        if piece.piece_type is not chess.KING:
+            total += PIECE_VALUE.get(piece.piece_type, 0)
+    return total
+
+def phase(board: chess.Board) -> float:
+    curr = material_total(board)
+    ph = (MAX_MATERIAL - curr) / MAX_MATERIAL
+    return float(max(0.0, min(1.0, ph)))

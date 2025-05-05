@@ -1,13 +1,12 @@
 import io
 import chess.pgn
+import numpy as np
 import pandas as pd
 from encode import create_board_planes
-import numpy as np
-from static_evaluate import evaluate
+import static_evaluate
+from matplotlib import pyplot as plt
 
-GAMMA = 0.995     # 终局折扣率
-ALPHA = 0.5       # 基础权重（0 全部靠阶段，1 全部靠差值）
-MIN_DELTA = 5     # 差值阈值，小于则视为平庸
+ALPHA = 0.5       # 基础权重，0 表示全部靠阶段
 BETA = 0.5        # 混合比例
 
 # get chess data with elo >= 2000
@@ -32,32 +31,28 @@ def get_data_set(samples=None):
         # 每 2 个 half-move 算作 1 个 full-move
         total_moves = (len(half_moves) + 1) // 2
         max_abs_value = 0.0
-        temp_Y = []
+        y_temp = []
         for index, move in enumerate(game.mainline_moves()):
             encoded = create_board_planes(board)
             x_train.append(encoded)
 
-            # 1. 静态评估差值
-            before = evaluate(board)
-            board.push(move)
-            after = evaluate(board)
-            delta = after - before
-            # 2. 阈值剪枝
-            if abs(delta) < MIN_DELTA:
-                delta = 0.0
-            # 3. 线性阶段因子 φ = t/T
-            phi = index / float(total_moves)
-            # 4. 阶段加权
-            local = delta * (ALPHA + (1 - ALPHA) * phi)
-            # 5. 折扣到当前步：γ^(T-t)
-            discount = GAMMA ** (total_moves - index)
-            raw = local * discount
+            # 1. 静态评估
+            static_value = static_evaluate.evaluate(board)
+            # 2. 材料相位 φ
+            phi = static_evaluate.phase(board)
+            # 3. 阶段加权 Tapered Eval
+            raw = static_value * (ALPHA + (1 - ALPHA) * phi)
 
             # y_t = BETA * res_value + (1 - BETA) * raw
             max_abs_value = max(max_abs_value, abs(raw))
-            temp_Y.append(raw)
+            y_temp.append(raw)
+            board.push(move)
 
-        y_train.extend([x / max_abs_value for x in temp_Y]) # 归一化处理
+        # 4. 标签数据归一化处理
+        y_norm = [x / max_abs_value for x in y_temp]
+        # TODO 考虑最终结果的影响
+
+        y_train.extend(y_norm)
         print(f"parsing game {game_cnt}, got {len(y_train)} examples")
 
         if samples is not None and len(y_train) > samples:
@@ -68,5 +63,5 @@ def get_data_set(samples=None):
     return x_train, y_train
 
 if __name__ == "__main__":
-    x_train, y_train = get_data_set(10000)
-    np.savez("data/dataset_10k_without_res.npz", x_train, y_train)
+    x_train, y_train = get_data_set(5000000)
+    np.savez("data/dataset_5M_without_res.npz", x_train, y_train)

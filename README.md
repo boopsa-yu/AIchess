@@ -112,22 +112,7 @@ TODO:
 
 每一步操作的得分评估函数：
 
-```python
-before = evaluate(board)
-board.push(move)
-after = evaluate(board)
-delta = after - before
-# 2. 阈值剪枝
-if abs(delta) < MIN_DELTA:
-    delta = 0.0
-# 3. 线性阶段因子 φ = t/T
-phi = index / float(total_moves)
-# 4. 阶段加权
-local = delta * (ALPHA + (1 - ALPHA) * phi)
-# 5. 折扣到当前步：γ^(T-t)
-discount = GAMMA ** (total_moves - index)
-raw = local * discount
-```
+更新了，但是暂时没时间写清楚
 
 由于数据范围较大，因此做了简单的归一化，用当前得分除以当前对局得分绝对值的最大值。
 
