@@ -1,12 +1,11 @@
 # main.py
-from time import sleep
+import chess
+import logging
 from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-import chess
-from ai_chess import AIChess
-import logging
+from ai_chess import BoardEvaluator
 
 # 创建 FastAPI 应用实例
 app = FastAPI()
@@ -28,6 +27,8 @@ logger.addHandler(handler)  # 将日志输出至屏幕
 
 # 初始化棋局
 board = chess.Board()
+eval = BoardEvaluator("models/model0.2.pth")
+DEPTH = 3
 players = {
     chess.WHITE: "human",
     chess.BLACK: "ai"
@@ -102,11 +103,15 @@ def human_move(data) -> chess.Move:
 def ai_move(data=None) -> chess.Move:
     """AI移动生成逻辑"""
     global board
-    ai_chess = AIChess()
-    move = ai_chess.get_best_move(board)
-    if not move:
+    best_move, best_score = eval.get_best_moves(board, DEPTH)
+    print(best_move, best_score)
+    # print(type(best_moves))
+    # for move in best_moves[:3]:
+    #     logger.info(f"{move[0]}: {move[1]}")
+    # move = best_moves[0][0]
+    if not best_move:
         raise RuntimeError("AI无法生成合法移动")
-    return move
+    return best_move
 
 def one_move_step(move_generator, data) -> dict:
     """通用移动处理框架"""
@@ -125,6 +130,7 @@ def one_move_step(move_generator, data) -> dict:
     try:
         move = move_generator(data)  # data参数需要根据移动类型传递
     except Exception as e:
+        logger.info(str(e))
         return JSONResponse(
             content={'error': str(e)},
             status_code=400 if isinstance(e, ValueError) else 500

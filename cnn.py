@@ -68,7 +68,7 @@ class CNN(nn.Module):
 if __name__ == "__main__":
     device = "cuda"
 
-    chess_dataset = ChessValueDataset("data/dataset_10k_without_res.npz")
+    chess_dataset = ChessValueDataset("data/dataset_5M_without_res.npz")
     train_loader = torch.utils.data.DataLoader(chess_dataset, batch_size=256, shuffle=True)
     model = CNN()
     optimizer = optim.Adam(model.parameters())
@@ -102,4 +102,4 @@ if __name__ == "__main__":
             num_loss += 1
         # 计算每个 epoch 的平均损失
         print("%3d: %f" % (epoch, all_loss/num_loss))
-        torch.save(model.state_dict(), "models/model0.1.pth")
+        torch.save(model.state_dict(), "models/model0.2.pth")
