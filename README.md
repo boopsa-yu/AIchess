@@ -6,6 +6,12 @@
 
 elo 到达 1500 我就满意了
 
+代码执行方式
+
+```bash
+uvicorn main:app --reload
+```
+
 ## 国际象棋规则简述
 
 ### 棋盘与棋子
@@ -122,7 +128,7 @@ TODO:
 
 ## 训练数据来源
 
-[Chess Game Dataset (Lichess)](https://www.kaggle.com/datasets/datasnaek/chess)
+[Chess Games](https://www.kaggle.com/datasets/arevel/chess-games)
 
 ## 优化方向
 - 将棋局分为：开局、中局、残局。以优化棋局评估函数
